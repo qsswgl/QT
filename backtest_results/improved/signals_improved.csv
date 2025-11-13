@@ -1,0 +1,4 @@
+date,action,quantity,reason
+2013-05-13,TradeAction.BUY,205,趋势确认 + short_avg(77.99) > long_avg(62.07)
+2013-05-14,TradeAction.BUY,177,趋势确认 + short_avg(82.60) > long_avg(64.99)
+2020-03-18,TradeAction.SELL,382,short_avg(412.16) < long_avg(565.92)
