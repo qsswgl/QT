@@ -163,9 +163,9 @@ def run_daily_check_with_email():
             print("✓ 暂无新交易信号")
             print()
             
-            # 发送每日总结邮件 - 参考周度策略
+            # 发送每日总结邮件
             print("[步骤 4/4] 📧 发送每日总结...")
-            email_service.send_weekly_summary(
+            email_service.send_daily_summary(
                 has_signal=False,
                 signal_count=0,
                 latest_signal=None,
@@ -179,7 +179,7 @@ def run_daily_check_with_email():
         # 发送错误通知邮件
         print()
         print("📧 发送错误通知邮件...")
-        email_service.send_weekly_summary(
+        email_service.send_daily_summary(
             has_signal=False,
             signal_count=0,
             latest_signal=None,

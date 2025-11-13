@@ -96,7 +96,46 @@ class EmailService:
         
         # 构建邮件正文
         body = self._build_summary_email_body(
-            has_signal, signal_count, latest_signal, error_message
+            has_signal, signal_count, latest_signal, error_message, strategy_type="周度策略"
+        )
+        
+        # 发送邮件
+        return self._send_email(subject, body)
+    
+    def send_daily_summary(
+        self,
+        has_signal: bool,
+        signal_count: int = 0,
+        latest_signal: Optional[dict] = None,
+        error_message: Optional[str] = None
+    ) -> bool:
+        """
+        发送每日检查总结邮件
+        
+        Args:
+            has_signal: 是否有新信号
+            signal_count: 信号数量
+            latest_signal: 最新信号详情
+            error_message: 错误信息(如果有)
+        
+        Returns:
+            bool: 是否发送成功
+        """
+        if not self.config.enabled:
+            print("📧 邮件推送未启用")
+            return False
+        
+        # 构建邮件主题
+        if error_message:
+            subject = f"{self.config.subject_prefix} ⚠️ 每日检查失败"
+        elif has_signal:
+            subject = f"{self.config.subject_prefix} 🚨 发现新信号!"
+        else:
+            subject = f"{self.config.subject_prefix} ✅ 每日检查完成 - 无新信号"
+        
+        # 构建邮件正文
+        body = self._build_summary_email_body(
+            has_signal, signal_count, latest_signal, error_message, strategy_type="日度策略"
         )
         
         # 发送邮件
@@ -307,9 +346,18 @@ class EmailService:
         has_signal: bool,
         signal_count: int,
         latest_signal: Optional[dict],
-        error_message: Optional[str]
+        error_message: Optional[str],
+        strategy_type: str = "周度策略"
     ) -> str:
-        """构建每周总结邮件正文"""
+        """构建总结邮件正文
+        
+        Args:
+            has_signal: 是否有信号
+            signal_count: 信号数量
+            latest_signal: 最新信号详情
+            error_message: 错误信息
+            strategy_type: 策略类型（"日度策略" 或 "周度策略"）
+        """
         
         if error_message:
             # 错误通知
@@ -351,14 +399,14 @@ class EmailService:
 </head>
 <body>
     <div class="header">
-        <h1>⚠️ 策略检查失败</h1>
+        <h1>⚠️ {strategy_type}检查失败</h1>
     </div>
     <div class="content">
         <div class="error-box">
             <h3>错误信息:</h3>
             <p>{error_message}</p>
         </div>
-        <p>建议: 手动运行 weekly_check.bat 检查详细错误</p>
+        <p>建议: 手动检查日志获取详细错误信息</p>
     </div>
 </body>
 </html>
@@ -421,7 +469,7 @@ class EmailService:
 <body>
     <div class="header">
         <h1>🚨 发现新信号!</h1>
-        <p>TSLA 策略每周检查</p>
+        <p>TSLA {strategy_type}检查</p>
     </div>
     <div class="content">
         <div class="highlight">
@@ -488,7 +536,7 @@ class EmailService:
 </head>
 <body>
     <div class="header">
-        <h1>✅ 每周检查完成</h1>
+        <h1>✅ {strategy_type}检查完成</h1>
         <p>TSLA 策略运行正常</p>
     </div>
     <div class="content">
@@ -498,7 +546,7 @@ class EmailService:
             <p>策略运行正常,继续持有当前仓位即可</p>
         </div>
         <p style="padding: 15px; background: #e7f3ff; border-radius: 5px;">
-            <strong>💡 提示:</strong> 无需任何操作,下周继续自动检查
+            <strong>💡 提示:</strong> 无需任何操作,系统将继续自动检查
         </p>
         <p style="text-align: center; color: #666; margin-top: 30px;">
             📅 检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
