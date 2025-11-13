@@ -47,11 +47,19 @@ k:/QT/.venv/Scripts/python.exe -m src.pipeline.run_daily_check_email
 echo.
 
 echo ========================================
+echo [步骤 4/4] 记录策略执行日志...
+echo ========================================
+echo.
+k:/QT/.venv/Scripts/python.exe -m src.pipeline.log_strategy_execution
+echo.
+
+echo ========================================
 echo ✅ 日度策略检查完成!
 echo ========================================
 echo.
 echo 📧 邮件主题: [TSLA策略] 日度策略
 echo 📂 信号文件: backtest_results\daily\signals_daily.csv
+echo 📝 执行日志: STRATEGY_EXECUTION_LOG.md
 echo.
 
 pause
