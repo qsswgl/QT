@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 """
-INTC策略执行日志记录�?
-自动记录每日INTC策略执行情况，便于每周回顾分�?
+INTC策略执行日志记录器
+自动记录每日INTC策略执行情况，便于每周回顾分析
 """
 import sys
 from pathlib import Path
@@ -15,7 +16,7 @@ DATA_DIR = project_root / "INTC"
 
 
 def read_latest_signal():
-    """读取最新信�?""
+    """读取最新信号"""
     signal_file = DATA_DIR / "backtest_results" / "daily" / "signals_daily.csv"
     
     if not signal_file.exists():
@@ -38,7 +39,7 @@ def read_latest_signal():
 
 
 def read_latest_price():
-    """读取最新价格数�?""
+    """读取最新价格数据"""
     data_file = DATA_DIR / "data" / f"sample_{SYMBOL.lower()}.csv"
     
     if not data_file.exists():
@@ -81,20 +82,20 @@ def count_recent_signals(days=7):
 def generate_daily_log_entry(strategy_type=f"{SYMBOL}日度策略"):
     """生成每日日志条目"""
     now = datetime.now()
-    weekday_cn = ["一", "�?, "�?, "�?, "�?, "�?, "�?]
+    weekday_cn = ["一", "二", "三", "四", "五", "六", "日"]
     weekday = weekday_cn[now.weekday()]
     
     latest_signal = read_latest_signal()
     latest_price = read_latest_price()
     recent_signal_count = count_recent_signals(7)
     
-    data_update_status = "�?成功" if latest_price else "�?失败"
+    data_update_status = "✅ 成功" if latest_price else "❌ 失败"
     data_date = latest_price['date'] if latest_price else "N/A"
-    data_integrity = "�?良好" if latest_price else "⚠️ 缺失"
+    data_integrity = "✅ 良好" if latest_price else "⚠️ 缺失"
     
     if latest_price:
         close_price = f"${latest_price['close']:.2f}"
-        price_change = f"{latest_price['price_change']:+.2f}% (较前�?"
+        price_change = f"{latest_price['price_change']:+.2f}% (较前日)"
         volume = f"{latest_price['volume']:,}"
         avg_volume = f"{latest_price['avg_volume_5d']:,}"
     else:
@@ -103,17 +104,17 @@ def generate_daily_log_entry(strategy_type=f"{SYMBOL}日度策略"):
         volume = "N/A"
         avg_volume = "N/A"
     
-    signal_date = latest_signal['date'] if latest_signal else "无历史信�?
+    signal_date = latest_signal['date'] if latest_signal else "无历史信号"
     signal_action = latest_signal['action'] if latest_signal else "N/A"
     signal_price = f"${latest_signal['price']:.2f}" if latest_signal else "N/A"
     signal_reason = latest_signal['reason'] if latest_signal else "N/A"
     
-    operation_advice = "⚠️ 有新信号 - 请查看邮�? if recent_signal_count > 0 else "�?观望 - 无新信号"
+    operation_advice = "⚠️ 有新信号 - 请查看邮件" if recent_signal_count > 0 else "✅ 观望 - 无新信号"
     
     if latest_signal:
         last_operation = f"{latest_signal['date']} {latest_signal['action']} @ ${latest_signal['price']:.2f}"
     else:
-        last_operation = "无历史操�?
+        last_operation = "无历史操作"
     
     current_price_review = f"${latest_price['close']:.2f}" if latest_price else "N/A"
     
@@ -132,35 +133,35 @@ def generate_daily_log_entry(strategy_type=f"{SYMBOL}日度策略"):
 - 策略类型: {strategy_type}
 - 数据更新: {data_update_status}
 
-**数据状�?*:
-- 最新数据日�? {data_date}
-- 数据完整�? {data_integrity}
-- 数据来源: (请手动填�? Yahoo Finance / Alpha Vantage / Twelve Data)
+**数据状态**:
+- 最新数据日期: {data_date}
+- 数据完整性: {data_integrity}
+- 数据来源: (请手动填写: Yahoo Finance / Alpha Vantage / Twelve Data)
 
-**市场状�?*:
-- {SYMBOL}最新收�? {close_price}
+**市场状态**:
+- {SYMBOL}最新收盘: {close_price}
 - 价格变动: {price_change}
-- 成交�? {volume}
+- 成交量: {volume}
 - 5日平均成交量: {avg_volume}
 
 **信号情况**:
-- 最新信号日�? {signal_date}
+- 最新信号日期: {signal_date}
 - 信号类型: {signal_action}
 - 信号价格: {signal_price}
 - 信号原因: {signal_reason}
-- �?天信号数: {recent_signal_count}
+- 近7天信号数: {recent_signal_count}
 
 **策略决策**:
-- 当前持仓: (请根据实际情况填�? 空仓 / 持仓XXX�?
+- 当前持仓: (请根据实际情况填写: 空仓 / 持仓XXX股)
 - 操作建议: {operation_advice}
 - 决策依据: 
-  - (请根据信号情况填�?
+  - (请根据信号情况填写)
 
 **回顾分析**:
 - 上次操作: {last_operation}
 - 当前价格: {current_price_review}
 - 价差: {price_gap}
-- 策略表现: (请每周回顾时填写: �?正确 / �?错误 / ⚠️ 待观�?
+- 策略表现: (请每周回顾时填写: ✅ 正确 / ❌ 错误 / ⚠️ 待观察)
 
 **备注**:
 - (请添加任何特殊情况、系统问题或市场观察)
@@ -172,7 +173,7 @@ def generate_daily_log_entry(strategy_type=f"{SYMBOL}日度策略"):
 
 
 def append_to_log(entry):
-    """追加日志到文�?""
+    """追加日志到文件"""
     log_file = DATA_DIR / "STRATEGY_EXECUTION_LOG.md"
     
     if not log_file.exists():
@@ -195,41 +196,41 @@ def append_to_log(entry):
     with open(log_file, 'w', encoding='utf-8') as f:
         f.write(new_content)
     
-    print(f"�?日志已记录到: {log_file}")
+    print(f"✅ 日志已记录到: {log_file}")
     return True
 
 
 def main():
-    """主函�?""
+    """主函数"""
     print("=" * 70)
-    print(f"📊 {SYMBOL} 策略执行日志记录�?)
+    print(f"📊 {SYMBOL} 策略执行日志记录器")
     print("=" * 70)
     print()
     
     print("正在生成日志条目...")
     entry = generate_daily_log_entry()
     
-    print("\n生成的日志内�?")
+    print("\n生成的日志内容:")
     print("-" * 70)
     print(entry)
     print("-" * 70)
     print()
     
-    print("正在保存到日志文�?..")
+    print("正在保存到日志文件...")
     if append_to_log(entry):
         print()
         print("=" * 70)
-        print(f"�?{SYMBOL} 日志记录完成!")
+        print(f"✅ {SYMBOL} 日志记录完成!")
         print("=" * 70)
         print()
         print("💡 提示:")
-        print("  - 请查看并完善日志中的手动填写�?)
-        print("  - 每周日进行一次完整回�?)
+        print("  - 请查看并完善日志中的手动填写项")
+        print("  - 每周日进行一次完整回顾")
         print("  - 分析策略准确性和改进方向")
         print()
     else:
         print()
-        print("�?日志记录失败")
+        print("❌ 日志记录失败")
         print()
 
 

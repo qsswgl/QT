@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-INTC日度策略检�?- 带邮件推�?
+INTC日度策略检查 - 带邮件推送
 """
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.data.loader import CSVPriceLoader
-from src.pipeline.run_daily_strategy_INTC import DailyTradingStrategyINTC
+from src.pipeline.run_daily_strategy_intc import DailyTradingStrategyINTC
 from src.notification.email_service import EmailService
 
 
@@ -67,9 +68,9 @@ def check_for_new_signals() -> dict:
 def run_daily_check_with_email():
     """运行INTC日度检查并发送邮件通知"""
     print("=" * 80)
-    print("📊 INTC 日度策略检�?(邮件推送版)")
+    print("📊 INTC 日度策略检查 (邮件推送版)")
     print("=" * 80)
-    print(f"🕐 检查时�? {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🕐 检查时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
     print()
     
@@ -78,15 +79,15 @@ def run_daily_check_with_email():
     
     try:
         print("[步骤 1/4] 📂 加载INTC历史数据...")
-        data_path = project_root / "INTC" / "data" / "sample_INTC.csv"
+        data_path = project_root / "INTC" / "data" / "sample_intc.csv"
         
         if not data_path.exists():
-            raise FileNotFoundError(f"数据文件不存�? {data_path}")
+            raise FileNotFoundError(f"数据文件不存在: {data_path}")
         
         loader = CSVPriceLoader(data_path)
         bars = list(loader.load())
-        print(f"�?已加�?{len(bars)} 条历史数�?)
-        print(f"  日期范围: {bars[0].date} �?{bars[-1].date}")
+        print(f"✓ 已加载 {len(bars)} 条历史数据")
+        print(f"  日期范围: {bars[0].date} 至 {bars[-1].date}")
         print()
         
         print("[步骤 2/4] 🚀 运行INTC日度策略...")
@@ -102,13 +103,13 @@ def run_daily_check_with_email():
         results = strategy.run_backtest(bars)
         print()
         
-        print("[步骤 3/4] 🔍 检查新交易信号 (最�?�?...")
+        print("[步骤 3/4] 🔍 检查新交易信号 (最近1天)...")
         signal_info = check_for_new_signals()
         
         if signal_info['has_signal']:
-            print(f"�?发现 {signal_info['signal_count']} 个新信号!")
+            print(f"✅ 发现 {signal_info['signal_count']} 个新信号!")
             print()
-            print("最新信�?")
+            print("最新信号:")
             latest = signal_info['latest_signal']
             print(f"  日期: {latest['date']}")
             print(f"  动作: {latest['action']}")
@@ -117,7 +118,7 @@ def run_daily_check_with_email():
             print(f"  原因: {latest['reason']}")
             print()
             
-            print("[步骤 4/4] 📧 发送邮件提�?..")
+            print("[步骤 4/4] 📧 发送邮件提醒...")
             
             current_price = bars[-1].close
             
@@ -139,7 +140,7 @@ def run_daily_check_with_email():
                 strategy_name="INTC日度策略 (动量交易)"
             )
         else:
-            print("�?暂无新交易信�?)
+            print("✓ 暂无新交易信号")
             print()
             
             print("[步骤 4/4] 📧 发送每日总结...")
@@ -151,7 +152,7 @@ def run_daily_check_with_email():
             )
         
     except Exception as e:
-        print(f"�?发生错误: {e}")
+        print(f"❌ 发生错误: {e}")
         error_message = str(e)
         
         print()
@@ -165,13 +166,13 @@ def run_daily_check_with_email():
     
     print()
     print("=" * 80)
-    print("�?INTC日度策略检查完�?")
+    print("✅ INTC日度策略检查完成!")
     print("=" * 80)
     print()
     print("💡 提示:")
     print("  - 邮件已发送至: qsswgl@gmail.com")
-    print("  - 请检查你的邮�?包括垃圾邮件文件�?")
-    print("  - 如有新信�?请及时在 Firstrade 执行交易")
+    print("  - 请检查你的邮箱(包括垃圾邮件文件夹)")
+    print("  - 如有新信号,请及时在 Firstrade 执行交易")
     print()
 
 
