@@ -35,13 +35,23 @@
 ### 步骤2: 测试运行
 
 **测试周度策略**:
-```
+```powershell
+# 在PowerShell中运行
+cd K:\QT
+.\weekly_strategy_check.bat
+
+# 或者在文件管理器中双击运行
 双击: K:\QT\weekly_strategy_check.bat
 ```
 等待完成, 检查是否收到邮件
 
 **测试日度策略**:
-```
+```powershell
+# 在PowerShell中运行
+cd K:\QT
+.\daily_strategy_check.bat
+
+# 或者在文件管理器中双击运行
 双击: K:\QT\daily_strategy_check.bat  
 ```
 等待完成, 检查是否收到邮件
@@ -53,12 +63,18 @@
 #### 方案1: 每周手动运行 (简单)
 
 **周日晚上**:
-- 双击 `weekly_strategy_check.bat`
-- 收到邮件就去Firstrade执行
+```powershell
+cd K:\QT
+.\weekly_strategy_check.bat
+# 收到邮件就去Firstrade执行
+```
 
 **每天收盘后** (如果用日度策略):
-- 双击 `daily_strategy_check.bat`
-- 有信号就去Firstrade执行
+```powershell
+cd K:\QT
+.\daily_strategy_check.bat
+# 有信号就去Firstrade执行
+```
 
 ---
 

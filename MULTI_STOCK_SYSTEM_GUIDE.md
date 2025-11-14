@@ -76,29 +76,31 @@ python src/pipeline/update_data_multi_source.py INTC --days 365 --output INTC/da
 ### 2. 每日运行策略
 
 #### 方法1: 使用批处理文件（推荐）
-```bash
-# 运行NVDA策略
+```powershell
+# 在PowerShell中运行NVDA策略
 cd K:\QT\NVDA
-daily_strategy_check_nvda.bat
+.\daily_strategy_check_nvda.bat
 
 # 运行INTC策略
 cd K:\QT\INTC
-daily_strategy_check_intc.bat
+.\daily_strategy_check_intc.bat
+
+# 或者在文件管理器中直接双击运行对应的.bat文件
 ```
 
 #### 方法2: 手动执行各步骤
-```bash
+```powershell
 # 步骤1: 更新数据
-python src/pipeline/update_data_multi_source.py NVDA --output NVDA/data/sample_nvda.csv
+k:/QT/.venv/Scripts/python.exe src/pipeline/update_data_multi_source.py NVDA --output NVDA/data/sample_nvda.csv
 
 # 步骤2: 运行策略
-python src/pipeline/run_daily_strategy_nvda.py
+k:/QT/.venv/Scripts/python.exe src/pipeline/run_daily_strategy_nvda.py
 
 # 步骤3: 发送邮件通知
-python src/pipeline/run_daily_check_email_nvda.py
+k:/QT/.venv/Scripts/python.exe src/pipeline/run_daily_check_email_nvda.py
 
 # 步骤4: 记录日志
-python src/pipeline/log_strategy_execution_nvda.py
+k:/QT/.venv/Scripts/python.exe src/pipeline/log_strategy_execution_nvda.py
 ```
 
 ## 📧 邮件通知
@@ -303,14 +305,14 @@ pause
 复制 `NVDA/STRATEGY_EXECUTION_LOG.md` 到 `AMD/STRATEGY_EXECUTION_LOG.md`，并修改标题。
 
 ### 步骤6: 获取历史数据
-```bash
-python src/pipeline/update_data_multi_source.py AMD --days 365 --output AMD/data/sample_amd.csv
+```powershell
+k:/QT/.venv/Scripts/python.exe src/pipeline/update_data_multi_source.py AMD --days 365 --output AMD/data/sample_amd.csv
 ```
 
 ### 步骤7: 测试运行
-```bash
+```powershell
 cd AMD
-daily_strategy_check_amd.bat
+.\daily_strategy_check_amd.bat
 ```
 
 ## 🔧 策略参数调整
