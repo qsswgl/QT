@@ -2,6 +2,8 @@
 邮件发送服务
 """
 import smtplib
+import socket
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
@@ -559,7 +561,13 @@ class EmailService:
     
     def _send_email(self, subject: str, body: str) -> bool:
         """
-        发送邮件
+        发送邮件 (支持多账户故障转移)
+        
+        发送策略:
+        1. 依次尝试所有配置的邮件账户
+        2. 如果第一个账户失败,自动切换到下一个
+        3. 每个账户都有重试机制
+        4. 只要有一个账户发送成功即可
         
         Args:
             subject: 邮件主题
@@ -568,79 +576,177 @@ class EmailService:
         Returns:
             bool: 是否发送成功
         """
-        try:
-            # 创建邮件对象
-            message = MIMEMultipart('alternative')
-            message['From'] = Header(f"TSLA策略提醒 <{self.config.sender_email}>", 'utf-8')
-            message['To'] = Header(self.config.recipient_email, 'utf-8')
-            message['Subject'] = Header(subject, 'utf-8')
+        if not self.config.accounts:
+            print("❌ 错误: 没有配置任何邮件账户!")
+            return False
+        
+        # 遍历所有邮件账户,依次尝试
+        for account_idx, account in enumerate(self.config.accounts, 1):
+            print(f"\n{'='*60}")
+            print(f"📧 尝试使用账户 {account_idx}/{len(self.config.accounts)}: {account.name} ({account.sender_email})")
+            print(f"{'='*60}")
             
-            # 添加HTML正文
-            html_part = MIMEText(body, 'html', 'utf-8')
-            message.attach(html_part)
-            
-            # 连接SMTP服务器并发送
-            print(f"📧 正在连接邮件服务器 {self.config.smtp_server}:{self.config.smtp_port}...")
-            
-            if self.config.use_ssl:
-                # 使用SSL
-                with smtplib.SMTP_SSL(self.config.smtp_server, self.config.smtp_port) as server:
-                    print("📧 正在登录...")
-                    server.login(self.config.sender_email, self.config.sender_password)
-                    
-                    print("📧 正在发送邮件...")
-                    server.send_message(message)
-                    
-                    print(f"✅ 邮件发送成功! → {self.config.recipient_email}")
-                    return True
+            # 尝试用当前账户发送
+            if self._send_with_account(account, subject, body):
+                print(f"\n✅ 邮件发送成功! 使用账户: {account.name}")
+                return True
             else:
-                # 使用TLS
-                with smtplib.SMTP(self.config.smtp_server, self.config.smtp_port) as server:
-                    server.set_debuglevel(0)  # 关闭调试信息
-                    
-                    if self.config.use_tls:
-                        print("📧 正在启动TLS...")
-                        server.starttls()
-                    
-                    print("📧 正在登录...")
-                    server.login(self.config.sender_email, self.config.sender_password)
-                    
-                    print("📧 正在发送邮件...")
-                    server.send_message(message)
-                    
-                    print(f"✅ 邮件发送成功! → {self.config.recipient_email}")
-                    return True
+                print(f"\n⚠️ 账户 {account.name} 发送失败")
+                if account_idx < len(self.config.accounts):
+                    print(f"⏭️  正在切换到下一个账户...")
+        
+        # 所有账户都失败
+        print(f"\n{'='*60}")
+        print(f"❌ 邮件发送失败: 已尝试所有 {len(self.config.accounts)} 个账户")
+        print(f"{'='*60}")
+        return False
+    
+    def _send_with_account(self, account, subject: str, body: str) -> bool:
+        """
+        使用指定账户发送邮件 (带重试机制)
+        
+        Args:
+            account: 邮件账户配置
+            subject: 邮件主题
+            body: 邮件正文
+        
+        Returns:
+            bool: 是否发送成功
+        """
+        max_retries = 3  # 每个账户重试3次
+        retry_delay = 5   # 每次重试间隔5秒
+        timeout = 60      # SMTP超时60秒
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    print(f"⏳ 重试 {attempt}/{max_retries}...")
+                    time.sleep(retry_delay)
                 
-        except smtplib.SMTPAuthenticationError as e:
-            print(f"❌ 邮件认证失败: {e}")
-            print("   请检查邮箱地址和SMTP授权码是否正确")
-            return False
-        except smtplib.SMTPException as e:
-            print(f"❌ 邮件发送失败: {e}")
-            return False
-        except Exception as e:
-            print(f"❌ 发送邮件时发生错误: {e}")
-            return False
+                # 创建邮件对象
+                message = MIMEMultipart('alternative')
+                message['From'] = account.sender_email
+                message['To'] = self.config.recipient_email
+                message['Subject'] = Header(subject, 'utf-8')
+                
+                # 添加HTML正文
+                html_part = MIMEText(body, 'html', 'utf-8')
+                message.attach(html_part)
+                
+                # 连接SMTP服务器并发送
+                print(f"📧 正在连接 {account.smtp_server}:{account.smtp_port}...")
+                
+                if account.use_ssl:
+                    # 使用SSL
+                    server = smtplib.SMTP_SSL(account.smtp_server, account.smtp_port, timeout=timeout)
+                    try:
+                        server.set_debuglevel(0)
+                        print("📧 正在登录...")
+                        server.login(account.sender_email, account.sender_password)
+                        
+                        print("📧 正在发送邮件...")
+                        server.send_message(message)
+                        print(f"✅ 邮件发送成功! {account.sender_email} → {self.config.recipient_email}")
+                        
+                        # 发送成功,关闭连接并返回
+                        try:
+                            server.quit()
+                        except:
+                            pass  # 忽略quit错误
+                        return True
+                    finally:
+                        try:
+                            server.close()
+                        except:
+                            pass
+                else:
+                    # 使用TLS
+                    server = smtplib.SMTP(account.smtp_server, account.smtp_port, timeout=timeout)
+                    try:
+                        server.set_debuglevel(0)
+                        
+                        if account.use_tls:
+                            print("📧 正在启动TLS...")
+                            server.starttls()
+                        
+                        print("📧 正在登录...")
+                        server.login(account.sender_email, account.sender_password)
+                        
+                        print("📧 正在发送邮件...")
+                        server.send_message(message)
+                        print(f"✅ 邮件发送成功! {account.sender_email} → {self.config.recipient_email}")
+                        
+                        # 发送成功,关闭连接并返回
+                        try:
+                            server.quit()
+                        except:
+                            pass  # 忽略quit错误
+                        return True
+                    finally:
+                        try:
+                            server.close()
+                        except:
+                            pass
+                    
+            except smtplib.SMTPAuthenticationError as e:
+                print(f"❌ 认证失败: {e}")
+                print(f"   账户: {account.sender_email}")
+                print(f"   请检查邮箱地址和授权码是否正确")
+                return False  # 认证错误不重试,直接切换账户
+            except (socket.timeout, TimeoutError) as e:
+                print(f"⚠️ 网络超时 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    print(f"⚠️ 账户 {account.sender_email} 超时")
+                    return False
+                # 继续重试
+            except OSError as e:
+                # OSError通常表示连接被重置或其他网络问题
+                print(f"⚠️ 网络错误 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    print(f"⚠️ 账户 {account.sender_email} 网络错误")
+                    return False
+                # 继续重试
+            except smtplib.SMTPException as e:
+                print(f"❌ SMTP错误: {e}")
+                if attempt < max_retries - 1:
+                    print(f"⏳ 将在 {retry_delay} 秒后重试...")
+                else:
+                    return False
+            except Exception as e:
+                print(f"❌ 发送错误: {type(e).__name__}: {e}")
+                if attempt < max_retries - 1:
+                    print(f"⏳ 将在 {retry_delay} 秒后重试...")
+                else:
+                    return False
+        
+        return False
 
 
 def test_email():
     """测试邮件发送"""
     print("=" * 60)
-    print("📧 邮件推送测试")
+    print("📧 邮件推送测试 (多账户故障转移)")
     print("=" * 60)
     print()
     
     service = EmailService()
     
     print("配置信息:")
-    print(f"  发件人: {service.config.sender_email}")
     print(f"  收件人: {service.config.recipient_email}")
-    print(f"  SMTP服务器: {service.config.smtp_server}:{service.config.smtp_port}")
     print(f"  已启用: {service.config.enabled}")
+    print(f"  配置账户数: {len(service.config.accounts)}")
     print()
     
+    print("发件账户列表 (按优先级):")
+    for idx, account in enumerate(service.config.accounts, 1):
+        print(f"  {idx}. {account.name}")
+        print(f"     邮箱: {account.sender_email}")
+        print(f"     服务器: {account.smtp_server}:{account.smtp_port}")
+        print(f"     SSL: {account.use_ssl}, TLS: {account.use_tls}")
+        print()
+    
     # 测试发送信号提醒
-    print("测试1: 发送交易信号提醒...")
+    print("测试: 发送交易信号提醒...")
     print("-" * 60)
     
     success = service.send_signal_alert(
@@ -649,20 +755,18 @@ def test_email():
         quantity=2076,
         price=250.50,
         reason="趋势确认 + 强势突破信号",
-        signal_date="2025-11-12"
+        signal_date="2025-11-15"
     )
     
+    print()
+    print("=" * 60)
     if success:
-        print("✅ 测试1通过")
+        print("✅ 邮件推送测试通过!")
+        print(f"请检查邮箱: {service.config.recipient_email}")
     else:
-        print("❌ 测试1失败")
-    
-    print()
+        print("❌ 邮件推送测试失败!")
+        print("所有配置的邮件账户都无法发送")
     print("=" * 60)
-    print("✅ 邮件推送测试完成!")
-    print("=" * 60)
-    print()
-    print("请检查你的邮箱: qsoft@139.com")
     print()
 
 
