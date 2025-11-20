@@ -65,6 +65,79 @@ def check_for_new_signals() -> dict:
     return result
 
 
+def get_current_position(bars: list) -> dict:
+    """
+    获取INTC当前持仓信息
+    
+    Args:
+        bars: 价格数据列表
+        
+    Returns:
+        dict: 持仓信息
+    """
+    trades_file = project_root / "INTC" / "backtest_results" / "daily" / "trades_daily.csv"
+    
+    if not trades_file.exists():
+        return {
+            'symbol': 'INTC',
+            'quantity': 0,
+            'avg_price': 0,
+            'current_price': bars[-1].close if bars else 0,
+            'market_value': 0,
+            'profit_loss': 0,
+            'profit_loss_pct': 0
+        }
+    
+    trades_df = pd.read_csv(trades_file)
+    
+    if trades_df.empty:
+        return {
+            'symbol': 'INTC',
+            'quantity': 0,
+            'avg_price': 0,
+            'current_price': bars[-1].close if bars else 0,
+            'market_value': 0,
+            'profit_loss': 0,
+            'profit_loss_pct': 0
+        }
+    
+    current_price = bars[-1].close if bars else 0
+    
+    quantity = 0
+    total_cost = 0
+    
+    for _, trade in trades_df.iterrows():
+        if trade['action'] == 'BUY':
+            quantity += trade['quantity']
+            total_cost += trade['total']
+        elif trade['action'] == 'SELL':
+            if quantity > 0:
+                sell_ratio = trade['quantity'] / quantity
+                total_cost *= (1 - sell_ratio)
+                quantity -= trade['quantity']
+    
+    if quantity > 0:
+        avg_price = total_cost / quantity
+        market_value = quantity * current_price
+        profit_loss = market_value - total_cost
+        profit_loss_pct = (profit_loss / total_cost) * 100 if total_cost > 0 else 0
+    else:
+        avg_price = 0
+        market_value = 0
+        profit_loss = 0
+        profit_loss_pct = 0
+    
+    return {
+        'symbol': 'INTC',
+        'quantity': int(quantity),
+        'avg_price': avg_price,
+        'current_price': current_price,
+        'market_value': market_value,
+        'profit_loss': profit_loss,
+        'profit_loss_pct': profit_loss_pct
+    }
+
+
 def run_daily_check_with_email():
     """运行INTC日度检查并发送邮件通知"""
     print("=" * 80)
@@ -105,6 +178,11 @@ def run_daily_check_with_email():
         
         print("[步骤 3/4] 🔍 检查新交易信号 (最近1天)...")
         signal_info = check_for_new_signals()
+        
+        # 获取当前持仓信息
+        position_info = get_current_position(bars)
+        print(f"📊 当前持仓: {position_info['quantity']} 股 @ ${position_info['avg_price']:.2f}")
+        print()
         
         if signal_info['has_signal']:
             print(f"✅ 发现 {signal_info['signal_count']} 个新信号!")
@@ -148,7 +226,9 @@ def run_daily_check_with_email():
                 has_signal=False,
                 signal_count=0,
                 latest_signal=None,
-                error_message=None
+                error_message=None,
+                position_info=position_info,
+                symbol="INTC"
             )
         
     except Exception as e:
@@ -161,7 +241,8 @@ def run_daily_check_with_email():
             has_signal=False,
             signal_count=0,
             latest_signal=None,
-            error_message=error_message
+            error_message=error_message,
+            symbol="INTC"
         )
     
     print()

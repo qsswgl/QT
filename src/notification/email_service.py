@@ -53,9 +53,12 @@ class EmailService:
             print("📧 邮件推送未启用")
             return False
         
+        # 构建动态主题前缀
+        subject_prefix = f"[{symbol}策略]"
+        
         # 构建邮件主题
         action_cn = "买入" if action == "BUY" else "卖出"
-        subject = f"{self.config.subject_prefix} 🚨 {strategy_name} - {symbol} {action_cn}信号!"
+        subject = f"{subject_prefix} 🚨 {strategy_name} - {symbol} {action_cn}信号!"
         
         # 构建邮件正文
         body = self._build_signal_email_body(
@@ -109,7 +112,9 @@ class EmailService:
         has_signal: bool,
         signal_count: int = 0,
         latest_signal: Optional[dict] = None,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        position_info: Optional[dict] = None,
+        symbol: str = "TSLA"
     ) -> bool:
         """
         发送每日检查总结邮件
@@ -119,6 +124,8 @@ class EmailService:
             signal_count: 信号数量
             latest_signal: 最新信号详情
             error_message: 错误信息(如果有)
+            position_info: 当前持仓信息 {symbol, quantity, avg_price, current_price, market_value, profit_loss, profit_loss_pct}
+            symbol: 股票代码
         
         Returns:
             bool: 是否发送成功
@@ -127,17 +134,21 @@ class EmailService:
             print("📧 邮件推送未启用")
             return False
         
+        # 构建动态主题前缀
+        subject_prefix = f"[{symbol}策略]"
+        
         # 构建邮件主题
         if error_message:
-            subject = f"{self.config.subject_prefix} ⚠️ 每日检查失败"
+            subject = f"{subject_prefix} ⚠️ {symbol} 每日检查失败"
         elif has_signal:
-            subject = f"{self.config.subject_prefix} 🚨 发现新信号!"
+            subject = f"{subject_prefix} 🚨 {symbol} 发现新信号!"
         else:
-            subject = f"{self.config.subject_prefix} ✅ 每日检查完成 - 无新信号"
+            subject = f"{subject_prefix} ✅ {symbol} 每日检查完成 - 无新信号"
         
         # 构建邮件正文
         body = self._build_summary_email_body(
-            has_signal, signal_count, latest_signal, error_message, strategy_type="日度策略"
+            has_signal, signal_count, latest_signal, error_message, 
+            strategy_type="日度策略", position_info=position_info, symbol=symbol
         )
         
         # 发送邮件
@@ -349,7 +360,9 @@ class EmailService:
         signal_count: int,
         latest_signal: Optional[dict],
         error_message: Optional[str],
-        strategy_type: str = "周度策略"
+        strategy_type: str = "周度策略",
+        position_info: Optional[dict] = None,
+        symbol: str = "TSLA"
     ) -> str:
         """构建总结邮件正文
         
@@ -359,6 +372,8 @@ class EmailService:
             latest_signal: 最新信号详情
             error_message: 错误信息
             strategy_type: 策略类型（"日度策略" 或 "周度策略"）
+            position_info: 当前持仓信息
+            symbol: 股票代码
         """
         
         if error_message:
@@ -471,7 +486,7 @@ class EmailService:
 <body>
     <div class="header">
         <h1>🚨 发现新信号!</h1>
-        <p>TSLA {strategy_type}检查</p>
+        <p>{symbol} {strategy_type}检查</p>
     </div>
     <div class="content">
         <div class="highlight">
@@ -498,7 +513,68 @@ class EmailService:
             return html
         
         else:
-            # 无信号通知
+            # 无信号通知 - 包含持仓信息
+            # 构建持仓信息HTML
+            position_html = ""
+            if position_info and position_info.get('quantity', 0) > 0:
+                # 有持仓
+                symbol = position_info.get('symbol', 'N/A')
+                quantity = position_info.get('quantity', 0)
+                avg_price = position_info.get('avg_price', 0)
+                current_price = position_info.get('current_price', 0)
+                market_value = position_info.get('market_value', 0)
+                profit_loss = position_info.get('profit_loss', 0)
+                profit_loss_pct = position_info.get('profit_loss_pct', 0)
+                
+                # 盈亏颜色
+                pnl_color = "#00AA00" if profit_loss >= 0 else "#FF0000"
+                pnl_symbol = "+" if profit_loss >= 0 else ""
+                
+                position_html = f"""
+        <div class="position-box">
+            <h2 style="color: #667eea; margin-top: 0;">📊 当前持仓</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="background: #f0f0f0;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>股票代码</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">{symbol}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>持仓数量</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;"><strong>{quantity:,} 股</strong></td>
+                </tr>
+                <tr style="background: #f0f0f0;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>平均成本</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${avg_price:.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>当前价格</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;">${current_price:.2f}</td>
+                </tr>
+                <tr style="background: #f0f0f0;">
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>市值</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right;"><strong>${market_value:,.2f}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>浮动盈亏</strong></td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: right; color: {pnl_color};">
+                        <strong>{pnl_symbol}${abs(profit_loss):,.2f} ({pnl_symbol}{profit_loss_pct:.2f}%)</strong>
+                    </td>
+                </tr>
+            </table>
+        </div>
+                """
+            else:
+                # 空仓
+                position_html = """
+        <div class="position-box">
+            <h2 style="color: #667eea; margin-top: 0;">📊 当前持仓</h2>
+            <p style="text-align: center; font-size: 18px; color: #666; padding: 30px 0;">
+                <strong>⚪ 空仓</strong><br>
+                <span style="font-size: 14px;">等待买入信号</span>
+            </p>
+        </div>
+                """
+            
             html = f"""
 <!DOCTYPE html>
 <html>
@@ -534,19 +610,27 @@ class EmailService:
             border-radius: 5px;
             text-align: center;
         }}
+        .position-box {{
+            background: white;
+            border: 2px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }}
     </style>
 </head>
 <body>
     <div class="header">
         <h1>✅ {strategy_type}检查完成</h1>
-        <p>TSLA 策略运行正常</p>
+        <p>{symbol} 策略运行正常</p>
     </div>
     <div class="content">
         <div class="success-box">
-            <h2 style="color: #28a745; margin-top: 0;">📊 检查结果</h2>
+            <h2 style="color: #28a745; margin-top: 0;">📊 {symbol} 检查结果</h2>
             <p style="font-size: 18px;"><strong>暂无新交易信号</strong></p>
             <p>策略运行正常,继续持有当前仓位即可</p>
         </div>
+        {position_html}
         <p style="padding: 15px; background: #e7f3ff; border-radius: 5px;">
             <strong>💡 提示:</strong> 无需任何操作,系统将继续自动检查
         </p>
