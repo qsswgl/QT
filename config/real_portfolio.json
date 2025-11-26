@@ -1,0 +1,59 @@
+{
+  "account": {
+    "broker": "Firstrade",
+    "account_number": "98629659",
+    "total_value": 31987.84,
+    "cash": 0,
+    "update_time": "2025-11-25"
+  },
+  "positions": {
+    "NVDA": {
+      "symbol": "NVDA",
+      "quantity": 260,
+      "avg_price": 153.40,
+      "current_price": 153.40,
+      "market_value": 39884.00,
+      "cost_basis": 39884.00,
+      "unrealized_pnl": 0,
+      "unrealized_pnl_pct": 0,
+      "weight_pct": 124.7,
+      "target_weight_pct": 50.0,
+      "notes": "⚠️ 严重超配!需要减仓至140-200股"
+    },
+    "TSLA": {
+      "symbol": "TSLA",
+      "quantity": 60,
+      "avg_price": 412.80,
+      "current_price": 412.80,
+      "market_value": 24768.00,
+      "cost_basis": 24768.00,
+      "unrealized_pnl": 0,
+      "unrealized_pnl_pct": 0,
+      "weight_pct": 77.43,
+      "target_weight_pct": 33.33,
+      "notes": "正常持仓"
+    },
+    "INTC": {
+      "symbol": "INTC",
+      "quantity": 200,
+      "avg_price": 39.50,
+      "current_price": 39.50,
+      "market_value": 7900.00,
+      "cost_basis": 7900.00,
+      "unrealized_pnl": 0,
+      "unrealized_pnl_pct": 0,
+      "weight_pct": 24.70,
+      "target_weight_pct": 16.67,
+      "notes": "正常持仓"
+    }
+  },
+  "metadata": {
+    "last_update": "2025-11-25 22:00:00",
+    "data_source": "manual",
+    "notes": [
+      "持仓数据需要手动更新",
+      "每次交易后请更新quantity和avg_price",
+      "market_value会自动根据最新价格计算"
+    ]
+  }
+}

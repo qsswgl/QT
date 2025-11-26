@@ -19,6 +19,7 @@ sys.path.insert(0, str(project_root))
 
 from src.data.loader import CSVPriceLoader, PriceBar
 from src.backtest.engine import Backtester, TradeAction
+from src.utils.technical_indicators import TechnicalIndicators
 
 
 class DailyTradingStrategyNVDA:
@@ -30,9 +31,12 @@ class DailyTradingStrategyNVDA:
         position_pct: float = 0.6,  # 60%仓位
         momentum_window: int = 5,    # 5日动量
         trend_window: int = 20,      # 20日趋势过滤
-        volume_threshold: float = 1.3,  # 成交量阈值(相对平均)
-        profit_target: float = 0.05,    # 止盈5%
-        stop_loss: float = 0.02         # 止损2%
+        volume_threshold: float = 1.1,  # 成交量阈值(优化: 1.2 -> 1.1)
+        profit_target: float = 0.08,    # 止盈8%
+        stop_loss: float = 0.04,        # 止损4%
+        use_atr_stop: bool = False,     # 默认关闭ATR止损
+        atr_period: int = 14,           # ATR周期
+        atr_multiplier: float = 3.0     # ATR倍数
     ):
         self.initial_cash = initial_cash
         self.position_pct = position_pct
@@ -41,7 +45,27 @@ class DailyTradingStrategyNVDA:
         self.volume_threshold = volume_threshold
         self.profit_target = profit_target
         self.stop_loss = stop_loss
+        self.use_atr_stop = use_atr_stop
+        self.atr_period = atr_period
+        self.atr_multiplier = atr_multiplier
         self.symbol = "NVDA"
+    
+    def calculate_indicators(self, bars: List[PriceBar]) -> pd.DataFrame:
+        """计算技术指标"""
+        df = pd.DataFrame([
+            {'close': b.close, 'high': b.high, 'low': b.low} 
+            for b in bars
+        ])
+        
+        # 计算RSI
+        df['rsi'] = TechnicalIndicators.calculate_rsi(df['close'])
+        
+        # 计算ATR
+        df['atr'] = TechnicalIndicators.calculate_atr(
+            df['high'], df['low'], df['close'], self.atr_period
+        )
+        
+        return df
     
     def calculate_momentum(self, bars: List[PriceBar], current_idx: int) -> float:
         """计算短期动量"""
@@ -77,7 +101,7 @@ class DailyTradingStrategyNVDA:
         
         return bars[current_idx].close > ma
     
-    def should_buy(self, bars: List[PriceBar], current_idx: int, has_position: bool) -> bool:
+    def should_buy(self, bars: List[PriceBar], current_idx: int, has_position: bool, indicators: pd.DataFrame) -> bool:
         """判断是否应该买入"""
         if has_position:
             return False
@@ -91,14 +115,21 @@ class DailyTradingStrategyNVDA:
         momentum = self.calculate_momentum(bars, current_idx)
         volume_surge = self.check_volume_surge(bars, current_idx)
         
-        return momentum > 0.03 and volume_surge
+        # RSI过滤: 避免在超买区(>70)买入
+        rsi = indicators['rsi'].iloc[current_idx]
+        if rsi > 70:
+            return False
+            
+        # 优化: 降低动量门槛 (3% -> 2%) 以便更早入场
+        return momentum > 0.02 and volume_surge
     
     def should_sell(
         self, 
         bars: List[PriceBar], 
         current_idx: int, 
         has_position: bool,
-        entry_price: float = None
+        entry_price: float = None,
+        indicators: pd.DataFrame = None
     ) -> Tuple[bool, str]:
         """判断是否应该卖出"""
         if not has_position:
@@ -109,14 +140,24 @@ class DailyTradingStrategyNVDA:
         if entry_price:
             pnl_pct = (current_price - entry_price) / entry_price
             
+            # 动态止损逻辑
+            if self.use_atr_stop and indicators is not None:
+                atr = indicators['atr'].iloc[current_idx]
+                stop_price = entry_price - (atr * self.atr_multiplier)
+                
+                if current_price < stop_price:
+                    return True, f"ATR动态止损 (ATR={atr:.2f})"
+            else:
+                # 固定止损
+                if pnl_pct < -self.stop_loss:
+                    return True, f"止损 (亏损{pnl_pct:.2%})"
+            
             if pnl_pct > self.profit_target:
                 return True, f"止盈 (盈利{pnl_pct:.2%})"
-            
-            if pnl_pct < -self.stop_loss:
-                return True, f"止损 (亏损{pnl_pct:.2%})"
         
         momentum = self.calculate_momentum(bars, current_idx)
-        if momentum < -0.02:
+        # 优化: 放宽动量退出条件 (-2% -> -4%) 避免过早被震出
+        if momentum < -0.04:
             return True, f"动量转负 ({momentum:.2%})"
         
         return False, ""
@@ -129,6 +170,9 @@ class DailyTradingStrategyNVDA:
         entry_price = None
         last_trade_date = None
         
+        # 预计算指标
+        indicators = self.calculate_indicators(bars)
+        
         for idx, bar in enumerate(bars):
             current_date = pd.Timestamp(bar.date)
             
@@ -138,7 +182,7 @@ class DailyTradingStrategyNVDA:
             has_position = current_position > 0
             
             if has_position:
-                should_sell, reason = self.should_sell(bars, idx, has_position, entry_price)
+                should_sell, reason = self.should_sell(bars, idx, has_position, entry_price, indicators)
                 
                 if should_sell:
                     signals.append({
@@ -156,16 +200,19 @@ class DailyTradingStrategyNVDA:
                     last_trade_date = current_date
                     continue
             
-            if self.should_buy(bars, idx, has_position):
+            if self.should_buy(bars, idx, has_position, indicators):
                 position_value = current_cash * self.position_pct
                 quantity = int(position_value / bar.close)
                 
                 if quantity > 0:
+                    atr_val = indicators['atr'].iloc[idx]
+                    rsi_val = indicators['rsi'].iloc[idx]
+                    
                     signals.append({
                         'date': current_date,
                         'action': TradeAction.BUY,
                         'quantity': quantity,
-                        'reason': f"动量突破 + 成交量放大 (动量={self.calculate_momentum(bars, idx):.2%})",
+                        'reason': f"动量突破 + RSI({rsi_val:.1f})适中 (ATR={atr_val:.2f})",
                         'price': bar.close
                     })
                     
@@ -371,9 +418,11 @@ def main():
         position_pct=0.6,
         momentum_window=5,
         trend_window=20,
-        volume_threshold=1.3,
-        profit_target=0.05,
-        stop_loss=0.02
+        volume_threshold=1.2,
+        profit_target=0.08,
+        stop_loss=0.04,
+        use_atr_stop=False,     # 回测显示固定止损效果更好
+        atr_multiplier=3.0
     )
     
     results = strategy.run_backtest(bars)
