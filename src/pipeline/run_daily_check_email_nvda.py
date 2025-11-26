@@ -213,14 +213,20 @@ def run_daily_check_with_email():
         try:
             env_mgr = MarketEnvironmentManager()
             market_env = env_mgr.get_comprehensive_analysis('NVDA')
+            
+            # 获取板块相对强度 (新增)
+            sector_analysis = env_mgr.get_sector_analysis('NVDA')
+            
             # 显示简要信息
             print(f"✓ 宏观环境: {market_env['macro']['environment']} ({market_env['macro']['risk_level']} risk)")
             print(f"✓ 市场情绪: {market_env['sentiment']['overall_sentiment']} ({market_env['sentiment']['overall_score']}/100)")
+            print(f"✓ 板块强度: {sector_analysis['relative_strength']:+.2%} ({sector_analysis['status']})")
             print(f"✓ 综合风险: {market_env['overall_risk'].upper()}")
             print(f"✓ 建议仓位: {market_env['position_adjustment']:.0%}")
         except Exception as e:
             print(f"⚠️  市场环境分析失败: {e}")
             market_env = None
+            sector_analysis = None
         print()
         
         print("[步骤 1/6] 📊 获取基本面数据...")
@@ -436,6 +442,10 @@ def run_daily_check_with_email():
                         fundamental_note += f"- 原油: ${oil['price']} ({oil['change_pct']:+.2f}%)\n"
                 
                 fundamental_note += f"- 综合风险: {market_env['overall_risk'].upper()}\n"
+                
+                if sector_analysis:
+                    fundamental_note += f"- 板块相对强度: {sector_analysis['relative_strength']:+.2%} ({sector_analysis['status']})\n"
+                
                 fundamental_note += f"- 建议仓位: {market_env['position_adjustment']:.0%}\n"
                 fundamental_note += f"- 综合建议: {market_env['recommendation']}"
             

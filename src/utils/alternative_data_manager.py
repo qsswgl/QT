@@ -30,7 +30,8 @@ class AlternativeDataManager:
             'vix': '^VIX',      # 恐慌指数
             'gold': 'GC=F',     # 黄金期货
             'oil': 'CL=F',      # 原油期货
-            'usd_index': 'DX-Y.NYB' # 美元指数
+            'usd_index': 'DX-Y.NYB', # 美元指数
+            'us10y': '^TNX'     # 10年期美债收益率
         }
         
         result = {}
@@ -119,6 +120,33 @@ class AlternativeDataManager:
         except Exception as e:
             print(f"获取板块数据失败: {e}")
             return {}
+
+    def get_relative_strength(self, target_symbol: str, benchmark_symbol: str = 'SPY', period: str = '20d') -> float:
+        """计算相对强度 (Relative Strength)
+        
+        Args:
+            target_symbol: 目标股票代码 (e.g., 'NVDA')
+            benchmark_symbol: 基准代码 (e.g., 'SPY' or 'XLK')
+            period: 计算周期
+            
+        Returns:
+            float: 相对强度值 (>0 表示跑赢基准, <0 表示跑输)
+        """
+        try:
+            data = yf.download([target_symbol, benchmark_symbol], period=period, progress=False)['Close']
+            
+            if len(data) < 2:
+                return 0.0
+                
+            # 计算各自的收益率
+            target_ret = (data[target_symbol].iloc[-1] - data[target_symbol].iloc[0]) / data[target_symbol].iloc[0]
+            bench_ret = (data[benchmark_symbol].iloc[-1] - data[benchmark_symbol].iloc[0]) / data[benchmark_symbol].iloc[0]
+            
+            return target_ret - bench_ret
+            
+        except Exception as e:
+            print(f"计算相对强度失败 ({target_symbol} vs {benchmark_symbol}): {e}")
+            return 0.0
 
 if __name__ == "__main__":
     # 测试

@@ -219,13 +219,18 @@ def run_daily_check_with_email():
             market_env_mgr = MarketEnvironmentManager()
             market_env = market_env_mgr.get_comprehensive_analysis('INTC')
             
+            # 获取板块相对强度 (新增)
+            sector_analysis = market_env_mgr.get_sector_analysis('INTC')
+            
             print(f"✓ 宏观环境: {market_env['macro']['environment']} ({market_env['macro']['risk_level']} risk)")
             print(f"✓ 市场情绪: {market_env['sentiment']['overall_sentiment']} ({market_env['sentiment']['overall_score']:.1f}/100)")
+            print(f"✓ 板块强度: {sector_analysis['relative_strength']:+.2%} ({sector_analysis['status']})")
             print(f"✓ 综合风险: {market_env['overall_risk']}")
             print(f"✓ 建议仓位: {int(market_env['position_adjustment'] * 100)}%")
         except Exception as e:
             print(f"⚠️  市场环境分析失败: {e}")
             market_env = None
+            sector_analysis = None
         
         print()
         
@@ -420,6 +425,10 @@ def run_daily_check_with_email():
                         additional_info += f"- 原油: ${oil['price']} ({oil['change_pct']:+.2f}%)\n"
                 
                 additional_info += f"- 综合风险: {market_env['overall_risk']}\n"
+                
+                if sector_analysis:
+                    additional_info += f"- 板块相对强度: {sector_analysis['relative_strength']:+.2%} ({sector_analysis['status']})\n"
+                
                 additional_info += f"- 建议仓位调整: {int(market_env['position_adjustment'] * 100)}%"
             
             if health and health['score'] > 0:

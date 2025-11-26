@@ -246,8 +246,22 @@ class MarketEnvironmentManager:
                 vix_score = max(-50, min(50, vix_score))
                 print(f"   📊 VIX指数: {vix_val} (情绪贡献: {vix_score:.1f})")
             
-            # 综合评分 (新闻 60% + VIX 40%)
-            overall_score = (news_score * 0.6) + (vix_score * 0.4)
+            # 计算美债收益率影响 (新增)
+            yield_score = 0
+            yield_info = market_indicators.get('us10y')
+            if yield_info:
+                yield_val = yield_info['price']
+                yield_change = yield_info.get('change_pct', 0)
+                # 收益率快速上升对科技股是利空
+                if yield_change > 2.0:
+                    yield_score = -20
+                    print(f"   ⚠️ 美债收益率飙升 ({yield_val}%, +{yield_change}%) -> 情绪扣分")
+                elif yield_change < -2.0:
+                    yield_score = 10
+                    print(f"   📉 美债收益率回落 ({yield_val}%, {yield_change}%) -> 情绪加分")
+
+            # 综合评分 (新闻 50% + VIX 30% + 收益率 20%)
+            overall_score = (news_score * 0.5) + (vix_score * 0.3) + (yield_score)
             
             # 分类情绪
             if overall_score > 30:
@@ -436,7 +450,37 @@ class MarketEnvironmentManager:
             lines.append(f"建议仓位: 维持正常水平")
         
         return " | ".join(lines)
-
+    
+    def get_sector_analysis(self, symbol: str) -> Dict:
+        """获取板块相对强度分析"""
+        try:
+            from src.utils.alternative_data_manager import AlternativeDataManager
+            alt_mgr = AlternativeDataManager()
+            
+            # 默认假设是科技股，使用XLK作为基准
+            # 实际应用中应该根据symbol查找对应板块
+            benchmark = 'XLK'
+            if symbol in ['XOM', 'CVX']: benchmark = 'XLE'
+            elif symbol in ['JPM', 'BAC']: benchmark = 'XLF'
+            elif symbol in ['TSLA', 'AMZN', 'HD']: benchmark = 'XLY'  # 消费类 (TSLA属于非必需消费品)
+            
+            rs_score = alt_mgr.get_relative_strength(symbol, benchmark)
+            
+            status = 'neutral'
+            if rs_score > 0.05: status = 'leading'
+            elif rs_score < -0.05: status = 'lagging'
+            
+            print(f"   💪 相对强度 ({symbol} vs {benchmark}): {rs_score:+.2%} ({status})")
+            
+            return {
+                'relative_strength': rs_score,
+                'benchmark': benchmark,
+                'status': status
+            }
+        except Exception as e:
+            print(f"   ⚠️ 板块分析失败: {e}")
+            return {'relative_strength': 0, 'status': 'neutral'}
+        
 
 # 测试代码
 if __name__ == "__main__":
@@ -471,6 +515,13 @@ if __name__ == "__main__":
     print(f"  仓位调整: {analysis['position_adjustment']:.1%}")
     print(f"\n💡 建议:")
     print(f"  {analysis['recommendation']}")
+    
+    # 测试板块分析
+    print("\n【测试3: 板块相对强度分析】")
+    print("-" * 80)
+    sector_analysis = mgr.get_sector_analysis('NVDA')
+    print(f"\n相对强度: {sector_analysis['relative_strength']:+.2%}")
+    print(f"状态: {sector_analysis['status']}")
     
     print("\n" + "=" * 80)
     print("✅ 测试完成!")
